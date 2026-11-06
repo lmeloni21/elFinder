@@ -20,3 +20,9 @@ php/connector.minimal.php
 
 /vendor/
 /.rector-cache/
+.serena
+.claude
+/PHP85_MIGRATION.md
+/SECURITY_INTEGRATION.md
+/security-audit-matrix.md
+/security-review.md
