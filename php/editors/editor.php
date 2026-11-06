@@ -29,29 +29,22 @@ class elFinderEditor
     protected $allowed = array();
 
     /**
-     * elFinder instance
-     *
-     * @var object elFinder instance
-     */
-    protected $elfinder;
-
-    /**
-     * Arguments
-     *
-     * @var array argValues
-     */
-    protected $args;
-
-    /**
      * Constructor.
      *
      * @param object $elfinder
      * @param array  $args
      */
-    public function __construct($elfinder, $args)
+    public function __construct(
+        /**
+         * elFinder instance
+         */
+        protected $elfinder,
+        /**
+         * Arguments
+         */
+        protected $args
+    )
     {
-        $this->elfinder = $elfinder;
-        $this->args = $args;
     }
 
     /**
@@ -88,7 +81,7 @@ class elFinderEditor
      */
     public function argValue($key, $empty = '')
     {
-        return isset($this->args[$key]) ? $this->args[$key] : $empty;
+        return $this->args[$key] ?? $empty;
     }
 
     /**
@@ -109,7 +102,7 @@ class elFinderEditor
         $token = $this->createCallbackStateToken();
         $expires = time() + max(60, is_null($ttl) ? (int)$this->callbackStateTtl : (int)$ttl);
         $state = array(
-            'editor' => get_class($this),
+            'editor' => static::class,
             'method' => (string)$method,
             'token' => $token,
             'hash' => $hash,
@@ -176,7 +169,7 @@ class elFinderEditor
             return false;
         }
 
-        if (empty($state['editor']) || !$this->hashEquals($state['editor'], get_class($this))
+        if (empty($state['editor']) || !$this->hashEquals($state['editor'], static::class)
             || empty($state['method']) || !$this->hashEquals($state['method'], (string)$method)
             || empty($state['token']) || !$this->hashEquals($state['token'], $token)
             || !isset($state['expires']) || (int)$state['expires'] !== $expires
@@ -355,7 +348,7 @@ class elFinderEditor
      */
     protected function createCallbackSignature($method, $token, $expires, $secret)
     {
-        $payload = implode('|', array(get_class($this), (string)$method, (string)$token, (string)$expires));
+        $payload = implode('|', array(static::class, (string)$method, (string)$token, (string)$expires));
 
         return hash_hmac('sha256', $payload, (string)$secret);
     }

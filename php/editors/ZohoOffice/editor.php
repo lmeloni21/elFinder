@@ -4,6 +4,7 @@ class elFinderEditorZohoOffice extends elFinderEditor
 {
     private static $curlTimeout = 20;
 
+    #[\Override]
     protected $allowed = array('init', 'save', 'chk');
 
     protected $editor_settings = array(
@@ -70,7 +71,7 @@ class elFinderEditorZohoOffice extends elFinderEditor
     public function __construct($elfinder, $args)
     {
         parent::__construct($elfinder, $args);
-        $this->myName = preg_replace('/^elFinderEditor/i', '', get_class($this));
+        $this->myName = preg_replace('/^elFinderEditor/i', '', static::class);
     }
 
     public function enabled()
@@ -95,7 +96,7 @@ class elFinderEditorZohoOffice extends elFinderEditor
                 $save = false;
                 $ch = curl_init();
                 $conUrl = elFinder::getConnectorUrl();
-                curl_setopt($ch, CURLOPT_URL, $conUrl . (strpos($conUrl, '?') !== false? '&' : '?') . 'cmd=editor&name=' . $this->myName . '&method=chk&args[target]=' . rawurlencode($hash) . $cdata);
+                curl_setopt($ch, CURLOPT_URL, $conUrl . (str_contains($conUrl, '?')? '&' : '?') . 'cmd=editor&name=' . $this->myName . '&method=chk&args[target]=' . rawurlencode($hash) . $cdata);
                 curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
                 if ($cookie) {
                     curl_setopt($ch, CURLOPT_COOKIEJAR, $cookie);
@@ -103,7 +104,6 @@ class elFinderEditorZohoOffice extends elFinderEditor
                 }
                 $res = curl_exec($ch);
                 if (PHP_VERSION_ID < 80000) {
-                    curl_close($ch);
                 } else {
                     unset($ch);
                 }
@@ -176,7 +176,7 @@ class elFinderEditorZohoOffice extends elFinderEditor
                 }
                 if ($save) {
                     $conUrl = elFinder::getConnectorUrl();
-                    $data['callback_settings']['save_url'] = $conUrl . (strpos($conUrl, '?') !== false? '&' : '?') . 'cmd=editor&name=' . $this->myName . '&method=save' . $cdata;
+                    $data['callback_settings']['save_url'] = $conUrl . (str_contains($conUrl, '?')? '&' : '?') . 'cmd=editor&name=' . $this->myName . '&method=save' . $cdata;
                 }
                 foreach($data as $_k => $_v) {
                     if (is_array($_v)){
@@ -196,7 +196,6 @@ class elFinderEditorZohoOffice extends elFinderEditor
                 $res = curl_exec($ch);
                 $error = curl_error($ch);
                 if (PHP_VERSION_ID < 80000) {
-                    curl_close($ch);
                 } else {
                     unset($ch);
                 }
@@ -235,7 +234,7 @@ class elFinderEditorZohoOffice extends elFinderEditor
             return array('raw' => true, 'error' => '', 'header' => 'HTTP/1.1 500 Internal Server Error');
         }
 
-        $tmpName = isset($_FILES['content']['tmp_name']) ? $_FILES['content']['tmp_name'] : '';
+        $tmpName = $_FILES['content']['tmp_name'] ?? '';
         if (!$tmpName || !is_uploaded_file($tmpName) && !is_file($tmpName)) {
             return array('raw' => true, 'error' => '', 'header' => 'HTTP/1.1 500 Internal Server Error');
         }
@@ -272,7 +271,7 @@ class elFinderEditorZohoOffice extends elFinderEditor
     protected function getCallbackStateSecret()
     {
         return hash('sha256', implode('|', array(
-            __CLASS__,
+            self::class,
             __FILE__,
             ELFINDER_ZOHO_OFFICE_APIKEY
         )));

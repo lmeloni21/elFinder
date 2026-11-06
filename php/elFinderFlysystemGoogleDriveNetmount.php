@@ -77,9 +77,7 @@ class elFinderVolumeFlysystemGoogleDriveNetmount extends ExtDriver
             $options['client_secret'] = ELFINDER_GOOGLEDRIVE_CLIENTSECRET;
         }
 
-        if (!isset($options['pass'])) {
-            $options['pass'] = '';
-        }
+        $options['pass'] ??= '';
 
         try {
             $client = new \Google_Client();
@@ -115,7 +113,7 @@ class elFinderVolumeFlysystemGoogleDriveNetmount extends ExtDriver
                     $options['access_token'] = $aToken;
                     $this->session->set('GoogleDriveAuthParams', $options);
 
-                } catch (Exception $e) {
+                } catch (Exception) {
                     $aToken = [];
                     $options['access_token'] = [];
                     if ($options['user'] !== 'init') {
@@ -127,14 +125,14 @@ class elFinderVolumeFlysystemGoogleDriveNetmount extends ExtDriver
             }
 
             $itpCare = isset($options['code']);
-            $code = $itpCare? $options['code'] : (isset($_GET['code'])? $_GET['code'] : '');
+            $code = $itpCare? $options['code'] : ($_GET['code'] ?? '');
             if ($code || $options['user'] === 'init') {
                 if (empty($options['url'])) {
                     $options['url'] = elFinder::getConnectorUrl();
                 }
 
                 if (isset($options['id'])) {
-                    $callback = $options['url'] . (strpos($options['url'], '?') !== false? '&' : '?') . 'cmd=netmount&protocol=googledrive&host=' . ($options['id'] === 'elfinder'? '1' : $options['id']);
+                    $callback = $options['url'] . (str_contains($options['url'], '?')? '&' : '?') . 'cmd=netmount&protocol=googledrive&host=' . ($options['id'] === 'elfinder'? '1' : $options['id']);
                     $client->setRedirectUri($callback);
                 }
 
@@ -295,7 +293,7 @@ class elFinderVolumeFlysystemGoogleDriveNetmount extends ExtDriver
     {
         $creds = null;
         if (isset($opts['access_token'])) {
-            $this->netMountKey = md5(join('-', array('googledrive', $opts['path'], (isset($opts['access_token']['refresh_token']) ? $opts['access_token']['refresh_token'] : $opts['access_token']['access_token']))));
+            $this->netMountKey = md5(join('-', array('googledrive', $opts['path'], ($opts['access_token']['refresh_token'] ?? $opts['access_token']['access_token']))));
         }
 
         $client = new \Google_Client();
@@ -339,9 +337,7 @@ class elFinderVolumeFlysystemGoogleDriveNetmount extends ExtDriver
         $opts['filesystem'] = $filesystem;
         $opts['separator'] = '/';
         $opts['checkSubfolders'] = true;
-        if (!isset($opts['alias'])) {
-            $opts['alias'] = 'GoogleDrive';
-        }
+        $opts['alias'] ??= 'GoogleDrive';
 
         if ($res = parent::mount($opts)) {
             // update access_token of session data

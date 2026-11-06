@@ -3,8 +3,10 @@
   "description": "File manager for web",
   "main": "Jakefile.js",
   "scripts": {
-    "build": "mkdir ./build && jake -C ./build elfinder",
-    "build-minimal": "mkdir ./build && jake -C ./build elfinder-minimal"
+    "build": "mkdir -p ./build && jake -C ./build elfinder",
+    "build-minimal": "mkdir -p ./build && jake -C ./build elfinder-minimal",
+    "test:build": "node tests/security/build.cjs",
+    "test:browser": "playwright test -c tests/security/e2e/playwright.config.cjs"
   },
   "repository": {
     "type": "git",
@@ -26,9 +28,17 @@
   },
   "homepage": "http://studio-42.github.io/elFinder/",
   "devDependencies": {
-    "@playwright/test": "^1.64.1",
-    "csso": "<2.0.0",
+    "@playwright/test": "^1.65.0",
+    "csso": "^5.0.5",
     "jake": "^13.0.3",
-    "uglify-js": "~2.6.2"
+    "uglify-js": "^3.19.3"
+  },
+  "overrides": {
+    "filelist": {
+      "minimatch": "^11.0.5"
+    }
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

@@ -83,7 +83,7 @@ class elFinderPluginAutoRotate extends elFinderPlugin
         $srcImgInfo = null;
         if (extension_loaded('fileinfo') && function_exists('mime_content_type')) {
             $mime = mime_content_type($src);
-            if (substr($mime, 0, 5) !== 'image') {
+            if (!str_starts_with($mime, 'image')) {
                 return false;
             }
         }

@@ -1,0 +1,4 @@
+parameters:
+    # The example declares a local logger in a nonstandard PHP file extension.
+    scanFiles:
+        - php/connector.maximal.php-dist

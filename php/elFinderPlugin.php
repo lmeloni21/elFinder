@@ -26,7 +26,7 @@ class elFinderPlugin
      */
     protected function getCurrentOpts($volume)
     {
-        $name = substr(get_class($this), 14); // remove "elFinderPlugin"
+        $name = substr(static::class, 14); // remove "elFinderPlugin"
         $opts = $this->opts;
         if (is_object($volume)) {
             $volOpts = $volume->getOptionsPlugin($name);

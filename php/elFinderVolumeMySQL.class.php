@@ -15,6 +15,7 @@ class elFinderVolumeMySQL extends elFinderVolumeDriver
      *
      * @var string
      **/
+    #[\Override]
     protected $driverId = 'm';
 
     /**
@@ -317,7 +318,7 @@ class elFinderVolumeMySQL extends elFinderVolumeDriver
 
         $path = $this->normalizePathId($path);
 
-        return $path === null ? '' : $path;
+        return $path ?? '';
     }
 
     /**
@@ -487,7 +488,7 @@ class elFinderVolumeMySQL extends elFinderVolumeDriver
         if ($mimes) {
             $whrs = array();
             foreach ($mimes as $mime) {
-                if (strpos($mime, '/') === false) {
+                if (!str_contains($mime, '/')) {
                     $whrs[] = sprintf('f.mime LIKE \'%s/%%\'', $this->db->real_escape_string($mime));
                 } else {
                     $whrs[] = sprintf('f.mime = \'%s\'', $this->db->real_escape_string($mime));
@@ -782,9 +783,7 @@ class elFinderVolumeMySQL extends elFinderVolumeDriver
      **/
     protected function _scandir($path)
     {
-        return isset($this->dirsCache[$path])
-            ? $this->dirsCache[$path]
-            : $this->cacheDir($path);
+        return $this->dirsCache[$path] ?? $this->cacheDir($path);
     }
 
     /**

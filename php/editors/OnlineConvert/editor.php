@@ -2,6 +2,7 @@
 
 class elFinderEditorOnlineConvert extends elFinderEditor
 {
+    #[\Override]
     protected $allowed = array('init', 'api');
 
     public function enabled()
@@ -90,7 +91,6 @@ class elFinderEditorOnlineConvert extends elFinderEditor
             $info = curl_getinfo($ch);
             $error = curl_error($ch);
             if (PHP_VERSION_ID < 80000) {
-                curl_close($ch);
             } else {
                 unset($ch);
             }

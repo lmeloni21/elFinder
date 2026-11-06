@@ -22,7 +22,7 @@ for (const variant of ['full', 'minimal']) {
     if (source.length < 1000 || source.includes('undefined\n')) throw new Error(`Invalid build: ${file}`);
     new vm.Script(source, { filename: file });
   }
-  for (const file of ['php/elFinder.class.php', 'php/elFinderConnector.class.php', 'SECURITY_INTEGRATION.md']) {
+  for (const file of ['php/elFinder.class.php', 'php/elFinderConnector.class.php', 'SECURITY_INTEGRATION.md', 'PHP85_MIGRATION.md']) {
     if (!fs.existsSync(path.join(directory, file))) throw new Error(`Missing distribution file: ${file}`);
   }
   console.log(`PASS ${variant} build, full/minified JavaScript syntax and required distribution files`);

@@ -14,6 +14,7 @@ class elFinderVolumeTrashMySQL extends elFinderVolumeMySQL
      *
      * @var string
      **/
+    #[\Override]
     protected $driverId = 'tm';
 
     public function __construct()

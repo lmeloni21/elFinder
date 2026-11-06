@@ -1,6 +1,10 @@
 <?php
 
-define('ELFINDER_PHP_ROOT_PATH', dirname(__FILE__));
+if (PHP_VERSION_ID < 80500) {
+    throw new RuntimeException('This elFinder branch requires PHP 8.5 or newer.');
+}
+
+define('ELFINDER_PHP_ROOT_PATH', __DIR__);
 
 function elFinderAutoloader($name)
 {
@@ -33,7 +37,7 @@ function elFinderAutoloader($name)
         return include_once(ELFINDER_PHP_ROOT_PATH . '/' . $map[$name]);
     }
     $prefix = substr($name, 0, 14);
-    if (substr($prefix, 0, 8) === 'elFinder') {
+    if (str_starts_with($prefix, 'elFinder')) {
         if ($prefix === 'elFinderVolume') {
             $file = ELFINDER_PHP_ROOT_PATH . '/' . $name . '.class.php';
             return (is_file($file) && include_once($file));

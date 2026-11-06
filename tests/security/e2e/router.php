@@ -82,6 +82,7 @@ if ($path !== '/') { http_response_code(404); exit; }
 $variant = isset($_GET['bundle']) && $_GET['bundle'] === 'minimal' ? 'minimal' : 'full';
 $jquery = isset($_GET['jquery']) && $_GET['jquery'] === '4' ? '4.0.0' : '3.7.1';
 $stem = $variant === 'minimal' ? 'elfinder-minimal' : 'elfinder';
+$suffix = !empty($_GET['minified']) ? 'min' : 'full';
 header('Content-Type: text/html; charset=utf-8');
 ?>
 <!doctype html><html><head><meta charset="utf-8"><title>elFinder security fixture</title>
@@ -89,7 +90,7 @@ header('Content-Type: text/html; charset=utf-8');
 <link rel="stylesheet" href="/build/<?php echo $variant; ?>/css/elfinder.min.css">
 <script src="/jquery/jquery-<?php echo $jquery; ?>.js"></script>
 <script src="/jquery/jquery-ui-1.14.2/jquery-ui.js"></script>
-<script src="/build/<?php echo $variant; ?>/js/<?php echo $stem; ?>.full.js"></script>
+<script src="/build/<?php echo $variant; ?>/js/<?php echo $stem; ?>.<?php echo $suffix; ?>.js"></script>
 </head><body><div id="elfinder"></div><script>
 window.__elfinderXss = 0;
 window.fm = jQuery('#elfinder').elfinder({

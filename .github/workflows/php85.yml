@@ -1,0 +1,38 @@
+name: PHP 8.5 and browser regressions
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  migration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PHP_BINARY: php
+    steps:
+      - uses: actions/checkout@v7
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: curl, fileinfo, gd, mbstring, mysqli, zip, intl, ftp
+          coverage: none
+          tools: composer:v2
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: sudo apt-get update && sudo apt-get install -y mariadb-server openssl
+      - run: composer install --no-interaction --prefer-dist
+      - run: composer validate --strict
+      - run: composer audit
+      - run: composer rector:check -- --no-progress-bar
+      - run: npm ci
+      - run: npm audit
+      - run: python3 tests/security/run.py
+      - run: npm run test:build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser

@@ -82,7 +82,7 @@ class elFinderPluginNormalizer extends elFinderPlugin
             return false;
         }
         $this->replaced[$cmd] = array();
-        $key = (isset($this->keyMap[$cmd])) ? $this->keyMap[$cmd] : 'name';
+        $key = $this->keyMap[$cmd] ?? 'name';
 
         if (is_array($key)) {
             $keys = $key;
@@ -185,7 +185,7 @@ class elFinderPluginNormalizer extends elFinderPlugin
             }
         }
         if ($opts['umlauts']) {
-            if (strpos($str = htmlentities($str, ENT_QUOTES, 'UTF-8'), '&') !== false) {
+            if (str_contains($str = htmlentities($str, ENT_QUOTES, 'UTF-8'), '&')) {
                 $str = html_entity_decode(preg_replace('~&([a-z]{1,2})(?:acute|caron|cedil|circ|grave|lig|orn|ring|slash|tilde|uml);~i', '$1', $str), ENT_QUOTES, 'utf-8');
             }
         }

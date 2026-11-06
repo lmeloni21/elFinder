@@ -22,6 +22,8 @@ module.exports = defineConfig({
     { name: 'minimal-jquery3', metadata: { bundle: 'minimal', jquery: '3' } },
     { name: 'full-jquery4', metadata: { bundle: 'full', jquery: '4' } },
     { name: 'minimal-jquery4', metadata: { bundle: 'minimal', jquery: '4' } },
+    { name: 'full-minified-jquery4', metadata: { bundle: 'full', jquery: '4', minified: true } },
+    { name: 'minimal-minified-jquery4', metadata: { bundle: 'minimal', jquery: '4', minified: true } },
     { name: 'http', testMatch: 'protocol.spec.cjs' }
   ],
   webServer: {

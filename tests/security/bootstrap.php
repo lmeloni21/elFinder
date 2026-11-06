@@ -45,8 +45,9 @@ function securityRunTests($tests)
     foreach ($tests as $name => $test) {
         try {
             $test();
+            securityAssert(!str_contains(json_encode(elFinder::$phpErrors), 'DEPRECATED:'), 'PHP deprecations: ' . json_encode(elFinder::$phpErrors));
             echo "PASS " . $name . "\n";
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             ++$failures;
             echo "FAIL " . $name . ': ' . $e->getMessage() . "\n";
         }

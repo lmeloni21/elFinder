@@ -16,6 +16,7 @@ class elFinderVolumeBox extends elFinderVolumeDriver
      *
      * @var string
      **/
+    #[\Override]
     protected $driverId = 'bd';
 
     /**
@@ -58,6 +59,7 @@ class elFinderVolumeBox extends elFinderVolumeDriver
      *
      * @var string
      **/
+    #[\Override]
     protected $tmp = '';
 
     /**
@@ -65,6 +67,7 @@ class elFinderVolumeBox extends elFinderVolumeDriver
      *
      * @var string
      **/
+    #[\Override]
     public $netMountKey = '';
 
     /**
@@ -234,7 +237,7 @@ class elFinderVolumeBox extends elFinderVolumeDriver
             }
 
             $lock = '';
-            $aTokenFile = $this->aTokenFile? $this->aTokenFile : $this->_bd_getATokenFile();
+            $aTokenFile = $this->aTokenFile ?: $this->_bd_getATokenFile();
             if ($aTokenFile && is_file($aTokenFile)) {
                 $lock = $aTokenFile . '.lock';
                 if (file_exists($lock)) {
@@ -286,7 +289,7 @@ class elFinderVolumeBox extends elFinderVolumeDriver
                 }
                 $err = property_exists($decoded, 'error')? ' ' . $decoded->error : '';
                 $err .= property_exists($decoded, 'error_description')? ' ' . $decoded->error_description : '';
-                throw new \Exception($err? $err : elFinder::ERROR_REAUTH_REQUIRE);
+                throw new \Exception($err ?: elFinder::ERROR_REAUTH_REQUIRE);
             }
 
             $token = (object)array(
@@ -374,7 +377,7 @@ class elFinderVolumeBox extends elFinderVolumeDriver
                 $single = ($result->limit == 1) ? true : false;
                 if (!$single && $total > ($offset + $cnt)) {
                     $offset = $offset + $cnt;
-                    if (strpos($url, 'offset=') === false) {
+                    if (!str_contains($url, 'offset=')) {
                         $url .= '&offset=' . $offset;
                     } else {
                         $url = preg_replace('/^(.+?offset=)\d+(.*)$/', '${1}' . $offset . '$2', $url);
@@ -472,9 +475,7 @@ class elFinderVolumeBox extends elFinderVolumeDriver
     {
         $result = [];
 
-        if (null === $itemId) {
-            $itemId = '0';
-        }
+        $itemId ??= '0';
 
         if ($fetch_self) {
             $path = '/folders/' . $itemId . '?fields=' . self::FETCHFIELDS;
@@ -523,7 +524,7 @@ class elFinderVolumeBox extends elFinderVolumeDriver
 
         try {
             return $this->_bd_query($itemId, $fetch_self = true);
-        } catch (Exception $e) {
+        } catch (Exception) {
             $empty = new stdClass;
             return $empty;
         }
@@ -541,7 +542,7 @@ class elFinderVolumeBox extends elFinderVolumeDriver
     {
         $stat = array();
 
-        $stat['rev'] = isset($raw->id) ? $raw->id : 'root';
+        $stat['rev'] = $raw->id ?? 'root';
         $stat['name'] = $raw->name;
         if (!empty($raw->modified_at)) {
             $stat['ts'] = strtotime($raw->modified_at);
@@ -582,7 +583,7 @@ class elFinderVolumeBox extends elFinderVolumeDriver
 
             $contents = $this->_bd_fetch($url, true);
             return $contents;
-        } catch (Exception $e) {
+        } catch (Exception) {
             return false;
         }
     }
@@ -698,7 +699,7 @@ class elFinderVolumeBox extends elFinderVolumeDriver
             }
 
             $itpCare = isset($options['code']);
-            $code = $itpCare? $options['code'] : (isset($_GET['code'])? $_GET['code'] : '');
+            $code = $itpCare? $options['code'] : ($_GET['code'] ?? '');
             if ($code) {
                 try {
                     if (!empty($options['id'])) {
@@ -774,12 +775,12 @@ class elFinderVolumeBox extends elFinderVolumeDriver
 
                 if ($result === false) {
                     $redirect = elFinder::getConnectorUrl();
-                    $redirect .= (strpos($redirect, '?') !== false? '&' : '?') . 'cmd=netmount&protocol=box&host=' . ($options['id'] === 'elfinder'? '1' : $options['id']);
+                    $redirect .= (str_contains($redirect, '?')? '&' : '?') . 'cmd=netmount&protocol=box&host=' . ($options['id'] === 'elfinder'? '1' : $options['id']);
 
                     try {
                         $this->session->set('BoxTokens', (object)array('token' => null));
                         $url = self::AUTH_URL . '?' . http_build_query(array('response_type' => 'code', 'client_id' => $options['client_id'], 'redirect_uri' => $redirect));
-                    } catch (Exception $e) {
+                    } catch (Exception) {
                         return array('exit' => true, 'body' => '{msg:errAccess}');
                     }
 
@@ -819,7 +820,7 @@ class elFinderVolumeBox extends elFinderVolumeDriver
                     return array('exit' => true, 'body' => $html);
                 }
             }
-        } catch (Exception $e) {
+        } catch (Exception) {
             return array('exit' => true, 'body' => '{msg:errNetMountNoDriver}');
         }
 
@@ -1449,7 +1450,7 @@ class elFinderVolumeBox extends elFinderVolumeDriver
      **/
     protected function _inpath($path, $parent)
     {
-        return $path == $parent || strpos($path, $parent . '/') === 0;
+        return $path == $parent || str_starts_with($path, $parent . '/');
     }
 
     /***************** file stat ********************/
@@ -1522,7 +1523,7 @@ class elFinderVolumeBox extends elFinderVolumeDriver
      */
     protected function _dimensions($path, $mime)
     {
-        if (strpos($mime, 'image') !== 0) {
+        if (!str_starts_with($mime, 'image')) {
             return '';
         }
 
@@ -1533,7 +1534,7 @@ class elFinderVolumeBox extends elFinderVolumeDriver
                 $cache['height'] = $size[1];
                 $ret = array('dim' => $size[0] . 'x' . $size[1]);
                 $srcfp = fopen($work, 'rb');
-                $target = isset(elFinder::$currentArgs['target'])? elFinder::$currentArgs['target'] : '';
+                $target = elFinder::$currentArgs['target'] ?? '';
                 if ($subImgLink = $this->getSubstituteImgLink($target, $size, $srcfp)) {
                     $ret['url'] = $subImgLink;
                 }
@@ -1558,9 +1559,7 @@ class elFinderVolumeBox extends elFinderVolumeDriver
      */
     protected function _scandir($path)
     {
-        return isset($this->dirsCache[$path])
-            ? $this->dirsCache[$path]
-            : $this->cacheDir($path);
+        return $this->dirsCache[$path] ?? $this->cacheDir($path);
     }
 
     /**
@@ -1815,13 +1814,13 @@ class elFinderVolumeBox extends elFinderVolumeDriver
     {
         $itemId = '';
         if ($name === '') {
-            list($parentId, $itemId, $parent) = $this->_bd_splitPath($path);
+            [$parentId, $itemId, $parent] = $this->_bd_splitPath($path);
         } else {
             if ($stat) {
                 if (isset($stat['name'])) {
                     $name = $stat['name'];
                 }
-                if (isset($stat['rev']) && strpos($stat['hash'], $this->id) === 0) {
+                if (isset($stat['rev']) && str_starts_with($stat['hash'], $this->id)) {
                     $itemId = $stat['rev'];
                 }
             }
@@ -1832,7 +1831,7 @@ class elFinderVolumeBox extends elFinderVolumeDriver
         try {
             //Create or Update a file
             $metaDatas = stream_get_meta_data($fp);
-            $tmpFilePath = isset($metaDatas['uri']) ? $metaDatas['uri'] : '';
+            $tmpFilePath = $metaDatas['uri'] ?? '';
             // remote contents
             if (!$tmpFilePath || empty($metaDatas['seekable'])) {
                 $tmpHandle = $this->tmpfile();

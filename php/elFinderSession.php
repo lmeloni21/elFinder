@@ -114,15 +114,15 @@ class elFinderSession implements elFinderSessionInterface
         if (version_compare(PHP_VERSION, '7.3.0', '>=')) {
             session_set_cookie_params(array(
                 'lifetime' => isset($p['lifetime']) ? (int)$p['lifetime'] : 0,
-                'path' => isset($p['path']) ? $p['path'] : '/',
-                'domain' => isset($p['domain']) ? $p['domain'] : '',
+                'path' => $p['path'] ?? '/',
+                'domain' => $p['domain'] ?? '',
                 'secure' => !empty($p['secure']),
                 'httponly' => !empty($p['httponly']),
-                'samesite' => isset($p['samesite']) ? $p['samesite'] : 'Lax'
+                'samesite' => $p['samesite'] ?? 'Lax'
             ));
         } else {
             // PHP 5.5 compatible
-            $path = isset($p['path']) ? $p['path'] : '/';
+            $path = $p['path'] ?? '/';
             if (!empty($p['samesite'])) {
                 $path .= '; SameSite=' . $p['samesite'];
             }
@@ -130,7 +130,7 @@ class elFinderSession implements elFinderSessionInterface
             session_set_cookie_params(
                 isset($p['lifetime']) ? (int)$p['lifetime'] : 0,
                 $path,
-                isset($p['domain']) ? $p['domain'] : '',
+                $p['domain'] ?? '',
                 !empty($p['secure']),
                 !empty($p['httponly'])
             );
@@ -233,7 +233,7 @@ class elFinderSession implements elFinderSessionInterface
     {
         $session = null;
         if ($this->started) {
-            list($cat, $name) = array_pad(explode('.', $key, 2), 2, null);
+            [$cat, $name] = array_pad(explode('.', $key, 2), 2, null);
             if (is_null($name)) {
                 if (!isset($this->keys[$cat])) {
                     $name = $cat;
@@ -247,17 +247,13 @@ class elFinderSession implements elFinderSessionInterface
                 $cat = $this->keys['default'];
             }
             if (is_null($name)) {
-                if (!isset($_SESSION[$cat])) {
-                    $_SESSION[$cat] = null;
-                }
+                $_SESSION[$cat] ??= null;
                 $session =& $_SESSION[$cat];
             } else {
                 if (!isset($_SESSION[$cat]) || !is_array($_SESSION[$cat])) {
                     $_SESSION[$cat] = array();
                 }
-                if (!isset($_SESSION[$cat][$name])) {
-                    $_SESSION[$cat][$name] = null;
-                }
+                $_SESSION[$cat][$name] ??= null;
                 $session =& $_SESSION[$cat][$name];
             }
         }
@@ -349,7 +345,7 @@ class elFinderSession implements elFinderSessionInterface
             $this->start();
         }
 
-        list($cat, $name) = array_pad(explode('.', $key, 2), 2, null);
+        [$cat, $name] = array_pad(explode('.', $key, 2), 2, null);
         if (is_null($name)) {
             if (!isset($this->keys[$cat])) {
                 $name = $cat;

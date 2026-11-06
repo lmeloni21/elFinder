@@ -21,7 +21,7 @@ function securityConnectorRequest($finder, $request, $token = null)
 {
     $_SERVER['REQUEST_METHOD'] = 'POST';
     $_GET = array();
-    $_POST = $request;
+    $_POST = $request + array('debug' => true);
     $_FILES = array();
     unset($_SERVER['HTTP_X_ELFINDER_CSRF']);
     if ($token !== null) { $_SERVER['HTTP_X_ELFINDER_CSRF'] = $token; }
@@ -29,6 +29,7 @@ function securityConnectorRequest($finder, $request, $token = null)
         $connector = new SecurityCapturingConnector($finder);
         $connector->run();
     } catch (SecurityConnectorResponse $response) {
+        securityAssert(!str_contains(json_encode($response->data['debug']['backendErrors'] ?? []), 'DEPRECATED:'), 'Connector emitted a PHP deprecation');
         return $response->data;
     }
     throw new Exception('Connector did not produce a response');
@@ -62,6 +63,12 @@ securityAssert(!isset($initial['error']) && !empty($initial['csrf']), 'Initializ
 $token = $initial['csrf'];
 $tests = array();
 
+$tests['malformed command and target collection types return controlled errors'] = function () use ($finder) {
+    foreach (array(array('cmd' => array('open')), array('cmd' => 'info', 'targets' => 'invalid')) as $request) {
+        $response = securityConnectorRequest($finder, $request);
+        securityAssert(!empty($response['error']) && in_array(elFinder::ERROR_INV_PARAMS, $response['error']), 'Malformed request was not rejected');
+    }
+};
 $tests['initialization issues and reuses a session token'] = function () use ($finder, $rootHash, $token) {
     $response = securityConnectorRequest($finder, array('cmd' => 'open', 'init' => 1, 'target' => $rootHash));
     securityAssert($response['csrf'] === $token, 'Unexpired session token should be stable across tabs');

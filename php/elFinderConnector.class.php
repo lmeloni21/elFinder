@@ -7,11 +7,7 @@
  **/
 class elFinderConnector
 {
-    /**
-     * elFinder instance
-     *
-     * @var elFinder
-     **/
+    /** @var elFinder */
     protected $elFinder;
 
     /**
@@ -102,7 +98,6 @@ class elFinderConnector
      */
     public function __construct($elFinder, $debug = false)
     {
-
         $this->elFinder = $elFinder;
         $this->reqMethod = strtoupper($_SERVER["REQUEST_METHOD"]);
         if ($debug) {
@@ -318,14 +313,12 @@ class elFinderConnector
             if (!$src || $maxInputVars < count($parts)) {
                 $src = array();
                 foreach ($parts as $part) {
-                    list($key, $value) = array_pad(explode('=', $part), 2, '');
+                    [$key, $value] = array_pad(explode('=', $part), 2, '');
                     $key = rawurldecode($key);
                     if (preg_match('/^(.+?)\[([^\[\]]*)\]$/', $key, $m)) {
                         $key = $m[1];
                         $idx = $m[2];
-                        if (!isset($src[$key])) {
-                            $src[$key] = array();
-                        }
+                        $src[$key] ??= array();
                         if ($idx) {
                             $src[$key][$idx] = rawurldecode($value);
                         } else {
@@ -340,11 +333,17 @@ class elFinderConnector
             }
         }
 
+        // PHP 8 throws TypeError for array keys/count() on malformed request types.
+        if ((isset($src['cmd']) && !is_string($src['cmd']))
+            || (isset($src['targets']) && !is_array($src['targets']))) {
+            $this->output(array('error' => $this->elFinder->error(elFinder::ERROR_INV_PARAMS)));
+        }
+
         if (isset($src['targets']) && $this->elFinder->maxTargets && count($src['targets']) > $this->elFinder->maxTargets) {
             $this->output(array('error' => $this->elFinder->error(elFinder::ERROR_MAX_TARGTES)));
         }
 
-        $cmd = isset($src['cmd']) ? $src['cmd'] : '';
+        $cmd = $src['cmd'] ?? '';
         $args = array();
 
         if (!function_exists('json_encode')) {
@@ -388,7 +387,7 @@ class elFinderConnector
                     $this->output(array('error' => $this->elFinder->error(elFinder::ERROR_INV_PARAMS, $cmd)));
                 }
             } else {
-                $arg = isset($src[$name]) ? $src[$name] : '';
+                $arg = $src[$name] ?? '';
 
                 if (!is_array($arg) && $req !== '') {
                     $arg = trim($arg);
@@ -417,7 +416,7 @@ class elFinderConnector
                 }
             }
             $this->output($result);
-        } catch (elFinderAbortException $e) {
+        } catch (elFinderAbortException) {
             // connection aborted
             // unlock session data for multiple access
             $this->elFinder->getSession()->close();
@@ -575,8 +574,7 @@ class elFinderConnector
     {
         static $magic_quotes_gpc = NULL;
 
-        if ($magic_quotes_gpc === NULL)
-            $magic_quotes_gpc = (version_compare(PHP_VERSION, '5.4', '<') && get_magic_quotes_gpc());
+        $magic_quotes_gpc ??= version_compare(PHP_VERSION, '5.4', '<') && get_magic_quotes_gpc();
 
         if (is_array($args)) {
             return array_map(array(& $this, 'input_filter'), $args);
@@ -612,7 +610,7 @@ class elFinderConnector
     public static function outputJson($data)
     {
         // send header
-        $header = isset($data['header']) ? $data['header'] : self::$contentType;
+        $header = $data['header'] ?? self::$contentType;
         self::sendHeader($header);
 
         unset($data['header']);

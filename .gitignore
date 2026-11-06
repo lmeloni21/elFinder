@@ -17,3 +17,6 @@ node_modules
 .playwright-browsers
 php-old
 php/connector.minimal.php
+
+/vendor/
+/.rector-cache/

@@ -125,9 +125,7 @@ class elFinderVolumeSFTPphpseclib extends elFinderVolumeFTP {
         $this->rootName = $this->options['alias'];
         $this->options['separator'] = '/';
 
-        if (is_null($this->options['syncChkAsTs'])) {
-            $this->options['syncChkAsTs'] = true;
-        }
+        $this->options['syncChkAsTs'] ??= true;
 
         return $this->needOnline? $this->connect() : true;
 
@@ -278,7 +276,7 @@ class elFinderVolumeSFTPphpseclib extends elFinderVolumeFTP {
             $stat['isowner'] = isset($stat['owner']) ? ($this->options['owner'] ? true : ($stat['owner'] == $this->options['user'])) : true;
         }
 
-        $owner_computed = isset($stat['isowner']) ? $stat['isowner'] : $this->options['owner'];
+        $owner_computed = $stat['isowner'] ?? $this->options['owner'];
         $perm = $this->parsePermissions($info['permissions'], $owner_computed);
         $stat['name'] = $name;
         if ($info['type'] === NET_SFTP_TYPE_DIRECTORY) {
@@ -508,7 +506,7 @@ class elFinderVolumeSFTPphpseclib extends elFinderVolumeFTP {
             }
         }
 
-        $stat = $this->convEncIn(isset($this->cache[$outPath]) ? $this->cache[$outPath] : array());
+        $stat = $this->convEncIn($this->cache[$outPath] ?? array());
         if (!$this->mounted) {
             // dispose incomplete cache made by calling `stat` by 'startPath' option
             $this->cache = array();

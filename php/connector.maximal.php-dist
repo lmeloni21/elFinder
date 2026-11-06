@@ -161,22 +161,18 @@ function debug() {
 class elFinderSimpleLogger {
 
     /**
-     * Log file path
-     *
-     * @var string
-     **/
-    protected $file = '';
-
-    /**
      * constructor
      *
      * @return void
      * @author Dmitry (dio) Levashov
+     * @param string $path
      **/
-    public function __construct($path)
+    public function __construct(/**
+     * Log file path
+     **/
+    protected $file)
     {
-        $this->file = $path;
-        $dir = dirname($path);
+        $dir = dirname($this->file);
         if (!is_dir($dir)) {
             mkdir($dir);
         }

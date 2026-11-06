@@ -71,7 +71,7 @@ class elFinderPluginSanitizer extends elFinderPlugin
             return false;
         }
         $this->replaced[$cmd] = array();
-        $key = (isset($this->keyMap[$cmd])) ? $this->keyMap[$cmd] : 'name';
+        $key = $this->keyMap[$cmd] ?? 'name';
 
         if (is_array($key)) {
             $keys = $key;

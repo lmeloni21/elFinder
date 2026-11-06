@@ -14,6 +14,7 @@ class elFinderVolumeTrash extends elFinderVolumeLocalFileSystem
      *
      * @var string
      **/
+    #[\Override]
     protected $driverId = 't';
 
     public function __construct()

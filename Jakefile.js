@@ -84,6 +84,7 @@ var dirmode = 0755,
 				path.join(src, 'LICENSE.md'),
 				path.join(src, 'README.md'),
 				path.join(src, 'SECURITY_INTEGRATION.md'),
+				path.join(src, 'PHP85_MIGRATION.md'),
 				path.join(src, 'composer.json'),
 				path.join(src, 'elfinder.html'),
 				path.join(src, 'elfinder.legacy.html'),
@@ -98,6 +99,7 @@ var dirmode = 0755,
 				path.join(src, 'LICENSE.md'),
 				path.join(src, 'README.md'),
 				path.join(src, 'SECURITY_INTEGRATION.md'),
+				path.join(src, 'PHP85_MIGRATION.md'),
 				path.join(src, 'composer.json'),
 				path.join(src, 'elfinder-minimal.html'),
 				path.join(src, 'main-minimal.default.js')
@@ -334,16 +336,9 @@ desc('uglify elfinder.min.js');
 file({'js/elfinder.min.js': ['js/elfinder.full.js']}, function () {
 	console.log('uglify elfinder.min.js');
 	var result;
-	if (typeof ugjs.minify == 'undefined') {
-		var ugp  = ugjs.parser;
-		var ugu  = ugjs.uglify;
-		var ast = ugp.parse(fs.readFileSync('js/elfinder.full.js').toString()); // parse code and get the initial AST
-		ast = ugu.ast_mangle(ast); // get a new AST with mangled names
-		ast = ugu.ast_squeeze(ast); // get an AST with compression optimizations
-		result = ugu.split_lines(ugu.gen_code(ast), 1024 * 8); // insert new line every 8 kb
-	} else {
-		result = ugjs.minify('js/elfinder.full.js').code;
-	}
+	var minified = ugjs.minify(fs.readFileSync('js/elfinder.full.js', 'utf8'));
+	if (minified.error) { throw minified.error; }
+	result = minified.code;
 	fs.writeFileSync(this.name, buildComment() + result);
 });
 
@@ -351,16 +346,9 @@ desc('uglify elfinder-minimal.min.js');
 file({'js/elfinder-minimal.min.js': ['js/elfinder-minimal.full.js']}, function () {
 	console.log('uglify elfinder-minimal.min.js');
 	var result;
-	if (typeof ugjs.minify == 'undefined') {
-		var ugp  = ugjs.parser;
-		var ugu  = ugjs.uglify;
-		var ast = ugp.parse(fs.readFileSync('js/elfinder-minimal.full.js').toString()); // parse code and get the initial AST
-		ast = ugu.ast_mangle(ast); // get a new AST with mangled names
-		ast = ugu.ast_squeeze(ast); // get an AST with compression optimizations
-		result = ugu.split_lines(ugu.gen_code(ast), 1024 * 8); // insert new line every 8 kb
-	} else {
-		result = ugjs.minify('js/elfinder-minimal.full.js').code;
-	}
+	var minified = ugjs.minify(fs.readFileSync('js/elfinder-minimal.full.js', 'utf8'));
+	if (minified.error) { throw minified.error; }
+	result = minified.code;
 	fs.writeFileSync(this.name, buildComment() + result);
 });
 
@@ -421,16 +409,9 @@ task('js/extras', function(){
 			base = name.replace(/\.js$/, '');
 			name = 'js/extras/' + name;
 			console.log('uglify ' + name);
-			if (typeof ugjs.minify == 'undefined') {
-				var ugp  = ugjs.parser;
-				var ugu  = ugjs.uglify;
-				var ast = ugp.parse(fs.readFileSync(files[i]).toString()); // parse code and get the initial AST
-				ast = ugu.ast_mangle(ast); // get a new AST with mangled names
-				ast = ugu.ast_squeeze(ast); // get an AST with compression optimizations
-				result = ugu.split_lines(ugu.gen_code(ast), 1024 * 8); // insert new line every 8 kb
-			} else {
-				result = ugjs.minify(files[i]).code;
-			}
+			var minified = ugjs.minify(fs.readFileSync(files[i], 'utf8'));
+			if (minified.error) { throw minified.error; }
+			result = minified.code;
 			fs.writeFileSync('js/extras/' + base + '.min.js', result);
 		}
 	}

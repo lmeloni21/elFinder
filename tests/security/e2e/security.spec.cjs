@@ -2,7 +2,7 @@ const { test, expect } = require('@playwright/test');
 
 async function initialize(page, metadata) {
   await page.request.get('/login');
-  await page.goto(`/?bundle=${metadata.bundle}&jquery=${metadata.jquery}`);
+  await page.goto(`/?bundle=${metadata.bundle}&jquery=${metadata.jquery}&minified=${metadata.minified ? 1 : 0}`);
   await page.waitForFunction(() => window.fm && fm.cwd() && fm.cwd().hash);
 }
 

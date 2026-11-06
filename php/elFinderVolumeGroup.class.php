@@ -15,6 +15,7 @@ class elFinderVolumeGroup extends elFinderVolumeDriver
      *
      * @var string
      **/
+    #[\Override]
     protected $driverId = 'g';
 
 

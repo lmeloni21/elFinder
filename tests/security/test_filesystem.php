@@ -167,7 +167,7 @@ $tests['resize rejects outside images and preserves normal image editing'] = fun
     $image = imagecreatetruecolor(8, 8);
     imagepng($image, $outside . '/image.png');
     imagepng($image, $root . '/image.png');
-    imagedestroy($image);
+    unset($image);
     $digest = hash_file('sha256', $outside . '/image.png');
     securityAssert($volume->resize(securityHash($volume, 'escape/image.png'), 4, 4, 0, 0) === false, 'Resize escaped root');
     securityAssert(hash_file('sha256', $outside . '/image.png') === $digest, 'Outside image was changed');

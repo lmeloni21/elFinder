@@ -114,7 +114,7 @@ class elFinderPluginWatermark extends elFinderPlugin
         $srcImgInfo = null;
         if (extension_loaded('fileinfo') && function_exists('mime_content_type')) {
             $mime = mime_content_type($src);
-            if (substr($mime, 0, 5) !== 'image') {
+            if (!str_starts_with($mime, 'image')) {
                 return false;
             }
         }
@@ -153,7 +153,7 @@ class elFinderPluginWatermark extends elFinderPlugin
         }
         // check water mark image
         if (!file_exists($opts['source'])) {
-            $opts['source'] = dirname(__FILE__) . "/" . $opts['source'];
+            $opts['source'] = __DIR__ . "/" . $opts['source'];
         }
         if (is_readable($opts['source'])) {
             $watermarkImgInfo = getimagesize($opts['source']);
@@ -209,10 +209,10 @@ class elFinderPluginWatermark extends elFinderPlugin
         $opts['position'] = strtoupper($opts['position']);
 
         // Set vertical position
-        if (strpos($opts['position'], 'T') !== false) {
+        if (str_contains($opts['position'], 'T')) {
             // Top
             $dest_x = $opts['marginX'];
-        } else if (strpos($opts['position'], 'M') !== false) {
+        } else if (str_contains($opts['position'], 'M')) {
             // Middle
             $dest_x = ($srcImgInfo[0] - $watermark_width) / 2;
         } else {
@@ -221,10 +221,10 @@ class elFinderPluginWatermark extends elFinderPlugin
         }
 
         // Set horizontal position
-        if (strpos($opts['position'], 'L') !== false) {
+        if (str_contains($opts['position'], 'L')) {
             // Left
             $dest_y = $opts['marginY'];
-        } else if (strpos($opts['position'], 'C') !== false) {
+        } else if (str_contains($opts['position'], 'C')) {
             // Middle
             $dest_y = ($srcImgInfo[1] - $watermark_height) / 2;
         } else {
