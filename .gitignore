@@ -14,5 +14,6 @@ elFinderVolumeSVN.class.php
 extensions
 files2
 node_modules
+.playwright-browsers
 php-old
 php/connector.minimal.php

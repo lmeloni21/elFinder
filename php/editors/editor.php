@@ -148,6 +148,10 @@ class elFinderEditor
             return false;
         }
 
+        if (!isset($post[$tokenKey], $post[$expiresKey], $post[$sigKey]) || !is_string($post[$tokenKey])
+            || !is_string($post[$sigKey]) || (!is_string($post[$expiresKey]) && !is_int($post[$expiresKey]))) {
+            return false;
+        }
         $token = isset($post[$tokenKey]) ? (string)$post[$tokenKey] : '';
         $expires = isset($post[$expiresKey]) ? (string)$post[$expiresKey] : '';
         $sig = isset($post[$sigKey]) ? (string)$post[$sigKey] : '';
@@ -157,13 +161,13 @@ class elFinderEditor
         }
 
         $expires = (int)$expires;
-        if ($expires < time()) {
-            $this->deleteCallbackState($token);
-            return false;
-        }
-
         $expectedSig = $this->createCallbackSignature($method, $token, $expires, $secret);
         if (!$this->hashEquals($expectedSig, $sig)) {
+            return false;
+        }
+        // Authenticate expiry before allowing it to delete an existing live state.
+        if ($expires <= time()) {
+            $this->deleteCallbackState($token);
             return false;
         }
 
@@ -363,18 +367,7 @@ class elFinderEditor
      */
     protected function createCallbackStateToken()
     {
-        if (function_exists('random_bytes')) {
-            return bin2hex(random_bytes(32));
-        }
-
-        if (function_exists('openssl_random_pseudo_bytes')) {
-            $bytes = openssl_random_pseudo_bytes(32);
-            if ($bytes !== false) {
-                return bin2hex($bytes);
-            }
-        }
-
-        return md5(uniqid(mt_rand(), true)) . md5(uniqid(mt_rand(), true));
+        return bin2hex(elFinder::secureRandomBytes(32));
     }
 
     /**

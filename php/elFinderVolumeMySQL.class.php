@@ -286,6 +286,21 @@ class elFinderVolumeMySQL extends elFinderVolumeDriver
         return $path === null ? null : (int)$path;
     }
 
+    /** Check ancestry using ids rather than stat(), which would recurse here. */
+    protected function pathInRoot($id)
+    {
+        $root = (int)$this->root;
+        $seen = array();
+        while (!isset($seen[$id])) {
+            if ($id === $root) { return true; }
+            $seen[$id] = true;
+            $result = $this->query(sprintf('SELECT parent_id FROM %s WHERE id=%d', $this->tbf, $id));
+            $row = $result ? $result->fetch_assoc() : false;
+            if (!$row || ($id = $this->pathId($row['parent_id'])) === null) { return false; }
+        }
+        return false;
+    }
+
     /**
      * Decode path from hash and reject non-numeric ids for the MySQL driver.
      *
@@ -394,11 +409,15 @@ class elFinderVolumeMySQL extends elFinderVolumeDriver
     protected function getParents($path)
     {
         $parents = array();
+        $seen = array();
 
-        while ($path) {
+        while ($path && !isset($seen[$path])) {
+            $seen[$path] = true;
             if ($file = $this->stat($path)) {
                 array_unshift($parents, $path);
                 $path = isset($file['phash']) ? $this->decode($file['phash']) : false;
+            } else {
+                break;
             }
         }
 
@@ -680,6 +699,10 @@ class elFinderVolumeMySQL extends elFinderVolumeDriver
     protected function _stat($path)
     {
         if (($fileId = $this->pathId($path)) === null) {
+            return array();
+        }
+        // Numeric ids are not authorization: an object must belong to this root.
+        if (!$this->pathInRoot($fileId)) {
             return array();
         }
 

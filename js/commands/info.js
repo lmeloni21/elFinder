@@ -152,7 +152,7 @@
 			}
 			
 			!hideItems.size && content.push(row.replace(l, msg.size).replace(v, size));
-			!hideItems.aleasfor && file.alias && content.push(row.replace(l, msg.aliasfor).replace(v, file.alias));
+			!hideItems.aleasfor && file.alias && content.push(row.replace(l, msg.aliasfor).replace(v, fm.escape(file.alias)));
 			if (!hideItems.path) {
 				if (path = fm.path(file.hash, true)) {
 					content.push(row.replace(l, msg.path).replace(v, applyZWSP(fm.escape(path))).replace('{class}', 'elfinder-info-path'));
@@ -163,7 +163,7 @@
 						replSpinner(msg.unknown, 'path');
 					})
 					.done(function(path) {
-						replSpinner(applyZWSP(path), 'path');
+						replSpinner(applyZWSP(fm.escape(path)), 'path');
 					}));
 				}
 			}

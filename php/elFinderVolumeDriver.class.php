@@ -2522,6 +2522,11 @@ abstract class elFinderVolumeDriver
             }
         }
 
+        // New uploads must respect path-specific permissions as existing files do.
+        if (!$this->allowCreate($dstpath, $name, false)) {
+            return $this->setError(elFinder::ERROR_PERM_DENIED);
+        }
+
         $stat = array(
             'mime' => $mime,
             'width' => 0,
@@ -2586,6 +2591,11 @@ abstract class elFinderVolumeDriver
 
         $destination = $this->decode($dst);
 
+        // A writable parent does not imply that this destination name is writable.
+        if (!$this->allowPaste($volume, $file, $destination, $name, $rmSrc)) {
+            return $this->setError($err, $errpath, elFinder::ERROR_PERM_DENIED);
+        }
+
         if (($test = $volume->closest($src, $rmSrc ? 'locked' : 'read', $rmSrc))) {
             return $rmSrc
                 ? $this->setError($err, $errpath, elFinder::ERROR_LOCKED, $volume->path($test))
@@ -2640,6 +2650,9 @@ abstract class elFinderVolumeDriver
         }
 
         // copy/move inside current volume
+        if ($name !== $file['name'] && !$this->allowPaste($volume, $file, $destination, $name, $rmSrc)) {
+            return $this->setError($err, $errpath, elFinder::ERROR_PERM_DENIED);
+        }
         if ($volume === $this) { //  changing == operand to === fixes issue #1285 - Paul Canning 24/03/2016
             $source = $this->decode($src);
             // do not copy into itself
@@ -4468,6 +4481,43 @@ abstract class elFinderVolumeDriver
     protected function allowCreate($dir, $name, $isDir = null)
     {
         return $this->attr($this->joinPathCE($dir, $name), 'write', true, $isDir);
+    }
+
+    /**
+     * Check destination policies for a whole tree before paste changes either side.
+     * A directory rename would otherwise bypass the policies for its children.
+     *
+     * @param elFinderVolumeDriver $volume source volume
+     * @param array $file source file stat
+     * @param string $dir destination directory
+     * @param string $name destination name
+     * @param bool $move whether hidden children are moved along with the directory
+     * @return bool
+     */
+    protected function allowPaste($volume, $file, $dir, $name, $move)
+    {
+        $isDir = ($file['mime'] === 'directory');
+        if (!$this->nameAccepted($name, $isDir) || !$this->allowCreate($dir, $name, $isDir)) {
+            return false;
+        }
+        // A symlink is copied/moved as a link, not as its target's directory tree.
+        if ($isDir && empty($file['thash'])) {
+            $children = $volume->scandir($file['hash']);
+            if ($children === false) {
+                return false;
+            }
+            $target = $this->joinPathCE($dir, $name);
+            foreach ($children as $child) {
+                elFinder::checkAborted();
+                if (!$move && !empty($child['hidden'])) {
+                    continue;
+                }
+                if (!$this->allowPaste($volume, $child, $target, $child['name'], $move)) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     /**
@@ -6977,6 +7027,7 @@ abstract class elFinderVolumeDriver
         $path = realpath($path);
         if ($arc['cmd'] === 'phpfunction') {
             if (is_callable($arc['argc'])) {
+                self::$maxArcFilesSize = $this->options['maxArcFilesSize'];
                 call_user_func_array($arc['argc'], array($path, $dir));
             }
         } else {
@@ -7314,7 +7365,7 @@ abstract class elFinderVolumeDriver
                 // Check total file size after extraction
                 $num = $zip->numFiles;
                 $size = 0;
-                $maxSize = empty(self::$maxArcFilesSize)? '' : (string)self::$maxArcFilesSize;
+                $maxSize = self::$maxArcFilesSize > 0 ? (string)self::$maxArcFilesSize : '';
                 $comp = function_exists('bccomp')? 'bccomp' : 'strnatcmp';
                 for ($i = 0; $i < $num; $i++) {
                     $stat = $zip->statIndex($i);
@@ -7323,7 +7374,7 @@ abstract class elFinderVolumeDriver
                         // Cannot handle values exceeding PHP_INT_MAX
                         throw new Exception(elFinder::ERROR_ARC_MAXSIZE);
                     }
-                    if (!$maxSize) {
+                    if ($maxSize) {
                         if ($comp($size, $maxSize) > 0) {
                             throw new Exception(elFinder::ERROR_ARC_MAXSIZE);
                         }

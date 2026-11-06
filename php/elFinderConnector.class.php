@@ -186,15 +186,7 @@ class elFinderConnector
      */
     protected function generateCsrfToken()
     {
-        if (function_exists('random_bytes')) {
-            return bin2hex(random_bytes(32));
-        }
-
-        if (function_exists('openssl_random_pseudo_bytes')) {
-            return bin2hex(openssl_random_pseudo_bytes(32));
-        }
-
-        return sha1(uniqid(mt_rand(), true) . microtime(true));
+        return bin2hex(elFinder::secureRandomBytes(32));
     }
 
     /**
@@ -374,7 +366,12 @@ class elFinderConnector
             $this->output(array('error' => $this->elFinder->error(elFinder::ERROR_UNKNOWN_CMD)));
         }
 
-        if ($this->csrfProtectedCommand($cmd)) {
+        // Only the bundled signed Zoho save callback authenticates independently.
+        // All browser editor calls (including custom plugins) require session CSRF.
+        $signedEditorCallback = $cmd === 'editor'
+            && isset($src['name'], $src['method'])
+            && $src['name'] === 'ZohoOffice' && $src['method'] === 'save';
+        if ($this->csrfProtectedCommand($cmd) || ($cmd === 'editor' && !$signedEditorCallback)) {
             if (!$this->validateCsrfToken()) {
                 $this->outputCsrfError();
             }

@@ -525,8 +525,10 @@ class elFinderVolumeLocalFileSystem extends elFinderVolumeDriver
     protected function _inpath($path, $parent)
     {
         $cwd = getcwd();
-        $real_path = $this->getFullPath($path, $cwd);
-        $real_parent = $this->getFullPath($parent, $cwd);
+        // Resolve symlinks as well as dot segments before checking the boundary.
+        // A lexical path inside the root can otherwise refer to an outside file.
+        $real_path = realpath($this->getFullPath($path, $cwd));
+        $real_parent = realpath($this->getFullPath($parent, $cwd));
         if ($real_path && $real_parent) {
             return $real_path === $real_parent || strpos($real_path, rtrim($real_parent, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR) === 0;
         }

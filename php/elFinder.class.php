@@ -2567,11 +2567,11 @@ class elFinder
             if (class_exists($class)) {
                 $editor = new $class($this, $args['args']);
                 $method = $args['method'];
-                if ($editor->isAllowedMethod($method) && method_exists($editor, $method)) {
+                if ($editor->enabled() && $editor->isAllowedMethod($method) && method_exists($editor, $method)) {
                     return $editor->$method();
                 }
             }
-            return array('error', $this->error(self::ERROR_UNKNOWN_CMD, 'editor.' . $name . '.' . $method));
+            return array('error' => $this->error(self::ERROR_UNKNOWN_CMD, 'editor.' . $name . '.' . $method));
         }
     }
 
@@ -2611,7 +2611,19 @@ class elFinder
      */
     protected function validate_address($url)
     {
+        if (!is_string($url) || $url === '') {
+            return false;
+        }
         $info = parse_url($url);
+        if ($info === false || empty($info['scheme']) || empty($info['host'])) {
+            return false;
+        }
+        $ports = array('http' => 80, 'https' => 443, 'ftp' => 21, 'ftps' => 990);
+        $info['scheme'] = strtolower($info['scheme']);
+        // Redirect destinations must obey the same protocol policy as initial URLs.
+        if (!isset($ports[$info['scheme']]) || (isset($info['port']) && $info['port'] < 1)) {
+            return false;
+        }
         $host = trim(strtolower($info['host']), '.');
         // do not support IPv6 address
         if (preg_match('/^\[.*\]$/', $host)) {
@@ -2658,8 +2670,10 @@ class elFinder
                 return false;
             }
             $info['ip'] = long2ip($long);
+            // Use exactly the hostname that was checked when pinning DNS in cURL.
+            $info['host'] = $host;
             if (!isset($info['port'])) {
-                $info['port'] = $info['scheme'] === 'https' ? 443 : 80;
+                $info['port'] = $ports[$info['scheme']];
             }
             if (!isset($info['path'])) {
                 $info['path'] = '/';
@@ -2743,7 +2757,13 @@ class elFinder
         }
         curl_setopt($ch, CURLOPT_LOW_SPEED_LIMIT, 1);
         curl_setopt($ch, CURLOPT_LOW_SPEED_TIME, $timeout);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+        if (defined('CURLOPT_PROTOCOLS_STR')) {
+            curl_setopt($ch, CURLOPT_PROTOCOLS_STR, 'http,https,ftp,ftps');
+        } else {
+            curl_setopt($ch, CURLOPT_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS | CURLPROTO_FTP | CURLPROTO_FTPS);
+        }
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
         curl_setopt($ch, CURLOPT_USERAGENT, $ua);
         curl_setopt($ch, CURLOPT_RESOLVE, array($info['host'] . ':' . $info['port'] . ':' . $info['ip']));
@@ -2756,11 +2776,8 @@ class elFinder
             } else {
                 unset($ch);
             }
-            $info = $this->validate_address($new_url);
-            if ($info === false) {
-                return false;
-            }
-            return $this->curl_get_contents($new_url, $timeout, $redirect_max - 1, $ua, $outfp, $info);
+            // Reapply the URL filter, protocol checks and credential removal on every hop.
+            return $this->get_remote_contents($new_url, $timeout, $redirect_max - 1, $ua, $outfp);
         }
         if ($result === false) {
             if (PHP_VERSION_ID < 80000) {
@@ -3225,137 +3242,173 @@ class elFinder
      */
     private function checkChunkedFile($tmpname, $chunk, $cid, $tempDir, $volume = null)
     {
-        /* @var elFinderVolumeDriver $volume */
-        if (preg_match('/^(.+)(\.\d+_(\d+))\.part$/s', $chunk, $m)) {
+        if (preg_match('/^(.+)\.(\d+)_(\d+)\.part$/s', $chunk, $m)) {
             $fname = $m[1];
-            $encname = md5($cid . '_' . $fname);
-            $base = $tempDir . DIRECTORY_SEPARATOR . 'ELF' . $encname;
-            $clast = intval($m[3]);
+            $index = (int)$m[2];
+            $last = (int)$m[3];
+            if ($index < 0 || $last < $index || (string)$index !== ltrim($m[2], '0') && $index !== 0
+                || (string)$last !== ltrim($m[3], '0') && $last !== 0) {
+                return array(self::ERROR_UPLOAD_TEMP, false);
+            }
+            // Bind all temporary paths to an unpredictable session and volume namespace.
+            $base = $tempDir . DIRECTORY_SEPARATOR . $this->getUploadTempPrefix($volume) . md5($cid . '_' . $fname);
             if (is_null($tmpname)) {
-                ignore_user_abort(true);
-                // chunked file upload fail
                 foreach (glob($base . '*') as $cf) {
-                    unlink($cf);
+                    is_file($cf) && unlink($cf);
                 }
-                ignore_user_abort(false);
                 return null;
             }
-
             $range = isset($_POST['range']) ? trim($_POST['range']) : '';
-            if ($range && preg_match('/^(\d+),(\d+),(\d+)$/', $range, $ranges)) {
-                $start = $ranges[1];
-                $len = $ranges[2];
-                $size = $ranges[3];
-                $tmp = $base . '.part';
-                $csize = filesize($tmpname);
-
-                $tmpExists = is_file($tmp);
-                if (!$tmpExists) {
-                    // check upload max size
-                    $uploadMaxSize = $volume ? $volume->getUploadMaxSize() : 0;
-                    if ($uploadMaxSize > 0 && $size > $uploadMaxSize) {
-                        return array(self::ERROR_UPLOAD_FILE_SIZE, false);
-                    }
-                    // make temp file
-                    $ok = false;
-                    if ($fp = fopen($tmp, 'wb')) {
-                        flock($fp, LOCK_EX);
-                        $ok = ftruncate($fp, $size);
-                        flock($fp, LOCK_UN);
-                        fclose($fp);
-                        touch($base);
-                    }
-                    if (!$ok) {
-                        unlink($tmp);
-                        return array(self::ERROR_UPLOAD_TEMP, false);
-                    }
-                } else {
-                    // wait until makeing temp file (for anothor session)
-                    $cnt = 1200; // Time limit 120 sec
-                    while (!is_file($base) && --$cnt) {
-                        usleep(100000); // wait 100ms
-                    }
-                    if (!$cnt) {
-                        return array(self::ERROR_UPLOAD_TEMP, false);
-                    }
-                }
-
-                // check size info
-                if ($len != $csize || $start + $len > $size || ($tmpExists && $size != filesize($tmp))) {
+            $ranges = array();
+            if ($range !== '') {
+                if (!preg_match('/^(\d+),(\d+),(\d+)$/', $range, $ranges)) {
                     return array(self::ERROR_UPLOAD_TEMP, false);
                 }
-
-                // write chunk data
-                $src = fopen($tmpname, 'rb');
-                $fp = fopen($tmp, 'cb');
-                fseek($fp, $start);
-                $writelen = stream_copy_to_stream($src, $fp, $len);
-                fclose($fp);
-                fclose($src);
-
-                try {
-                    // to check connection is aborted
-                    elFinder::checkAborted();
-                } catch (elFinderAbortException $e) {
-                    unlink($tmpname);
-                    is_file($tmp) && unlink($tmp);
-                    is_file($base) && unlink($base);
-                    throw $e;
+                for ($i = 1; $i <= 3; $i++) {
+                    $number = (int)$ranges[$i];
+                    if ($number < 0 || ((string)$number !== ltrim($ranges[$i], '0') && $number !== 0)) {
+                        return array(self::ERROR_UPLOAD_TEMP, false);
+                    }
+                    $ranges[$i] = $number;
                 }
-
-                if ($writelen != $len) {
+                if ($ranges[2] <= 0 || $ranges[3] <= 0 || $ranges[2] !== filesize($tmpname)
+                    || $ranges[2] > $ranges[3] || $ranges[1] > $ranges[3] - $ranges[2]
+                    || $last >= $ranges[3] || ($index === 0 && $ranges[1] !== 0)
+                    || ($index === $last && $ranges[1] + $ranges[2] !== $ranges[3])) {
                     return array(self::ERROR_UPLOAD_TEMP, false);
                 }
-
-                // write counts
-                file_put_contents($base, "\0", FILE_APPEND | LOCK_EX);
-
-                if (filesize($base) >= $clast + 1) {
-                    // Completion
-                    unlink($base);
-                    return array($tmp, $fname);
-                }
-            } else {
-                // old way
-                $part = $base . $m[2];
-                if (move_uploaded_file($tmpname, $part)) {
-                    chmod($part, 0600);
-                    if ($clast < count(glob($base . '*'))) {
-                        $parts = array();
-                        for ($i = 0; $i <= $clast; $i++) {
-                            $name = $base . '.' . $i . '_' . $clast;
-                            if (is_readable($name)) {
-                                $parts[] = $name;
-                            } else {
-                                $parts = null;
-                                break;
-                            }
-                        }
-                        if ($parts) {
-                            if (!is_file($base)) {
-                                touch($base);
-                                if ($resfile = tempnam($tempDir, 'ELF')) {
-                                    $target = fopen($resfile, 'wb');
-                                    foreach ($parts as $f) {
-                                        $fp = fopen($f, 'rb');
-                                        while (!feof($fp)) {
-                                            fwrite($target, fread($fp, 8192));
-                                        }
-                                        fclose($fp);
-                                        unlink($f);
-                                    }
-                                    fclose($target);
-                                    unlink($base);
-                                    return array($resfile, $fname);
-                                }
-                                unlink($base);
-                            }
-                        }
-                    }
+                if ($volume && $volume->getUploadMaxSize() > 0 && $ranges[3] > $volume->getUploadMaxSize()) {
+                    return array(self::ERROR_UPLOAD_FILE_SIZE, false);
                 }
             }
+            if (is_link($base) || is_link($base . '.part') || !($lock = fopen($base, 'c+b'))) {
+                return array(self::ERROR_UPLOAD_TEMP, false);
+            }
+            if (!flock($lock, LOCK_EX)) { fclose($lock); return array(self::ERROR_UPLOAD_TEMP, false); }
+            chmod($base, 0600);
+            $json = stream_get_contents($lock);
+            $state = $json === '' ? array('mode' => $range === '' ? 'legacy' : 'range', 'last' => $last, 'size' => $range === '' ? 0 : $ranges[3], 'parts' => array()) : json_decode($json, true);
+            if (!is_array($state) || !isset($state['parts']) || !empty($state['complete']) || $state['last'] !== $last
+                || $state['mode'] !== ($range === '' ? 'legacy' : 'range') || ($range !== '' && $state['size'] !== $ranges[3])) {
+                flock($lock, LOCK_UN); fclose($lock); return array(self::ERROR_UPLOAD_TEMP, false);
+            }
+            $result = $this->writeUploadChunk($tmpname, $base, $index, $last, $ranges, $state, $volume);
+            if (!isset($result[1]) || $result[1] !== false) {
+                $encoded = json_encode($state);
+                rewind($lock);
+                if ($encoded === false || !ftruncate($lock, 0) || fwrite($lock, $encoded) !== strlen($encoded)) {
+                    $result = array(self::ERROR_UPLOAD_TEMP, false);
+                }
+            }
+            flock($lock, LOCK_UN);
+            fclose($lock);
+            if (!empty($result[0]) && isset($result[1]) && $result[1] !== false) { $result[1] = $fname; }
+            return $result;
         }
-        return array('', '');
+        return array(self::ERROR_UPLOAD_TEMP, false);
+    }
+
+    /** Write a chunk while holding the upload metadata lock. */
+    private function writeUploadChunk($tmpname, $base, $index, $last, $ranges, &$state, $volume)
+    {
+        $tmp = $base . '.part';
+        $length = filesize($tmpname);
+        if ($ranges) {
+            $start = $ranges[1];
+            foreach ($state['parts'] as $i => $part) {
+                if ((int)$i === $index) {
+                    if ($part !== array($start, $length)) { return array(self::ERROR_UPLOAD_TEMP, false); }
+                } elseif ($start < $part[0] + $part[1] && $part[0] < $start + $length) {
+                    return array(self::ERROR_UPLOAD_TEMP, false);
+                }
+            }
+            $new = !is_file($tmp);
+            $fp = fopen($tmp, 'c+b');
+            if (!$fp) { return array(self::ERROR_UPLOAD_TEMP, false); }
+            chmod($tmp, 0600);
+            if (($new && !ftruncate($fp, $state['size'])) || fseek($fp, $start) !== 0) {
+                fclose($fp); return array(self::ERROR_UPLOAD_TEMP, false);
+            }
+            $src = fopen($tmpname, 'rb');
+            $written = $src ? stream_copy_to_stream($src, $fp, $length) : false;
+            $src && fclose($src);
+            fclose($fp);
+            if ($written !== $length) { return array(self::ERROR_UPLOAD_TEMP, false); }
+            $state['parts'][$index] = array($start, $length);
+        } else {
+            $size = $state['size'] - (isset($state['parts'][$index]) ? $state['parts'][$index][1] : 0) + $length;
+            if (!is_int($size) || ($volume && $volume->getUploadMaxSize() > 0 && $size > $volume->getUploadMaxSize())) {
+                return array(self::ERROR_UPLOAD_FILE_SIZE, false);
+            }
+            $part = $base . '.' . $index . '_' . $last;
+            if (is_link($part) || !move_uploaded_file($tmpname, $part)) { return array(self::ERROR_UPLOAD_TEMP, false); }
+            chmod($part, 0600);
+            $state['size'] = $size;
+            $state['parts'][$index] = array(0, $length);
+        }
+        if (count($state['parts']) !== $last + 1) { return array('', ''); }
+        ksort($state['parts'], SORT_NUMERIC);
+        if ($ranges) {
+            $offset = 0;
+            foreach ($state['parts'] as $part) {
+                if ($part[0] !== $offset) { return array(self::ERROR_UPLOAD_TEMP, false); }
+                $offset += $part[1];
+            }
+            if ($offset !== $state['size']) { return array(self::ERROR_UPLOAD_TEMP, false); }
+        } else {
+            $fp = fopen($tmp, 'xb');
+            if (!$fp) { return array(self::ERROR_UPLOAD_TEMP, false); }
+            chmod($tmp, 0600);
+            foreach ($state['parts'] as $i => $part) {
+                $path = $base . '.' . $i . '_' . $last;
+                $src = fopen($path, 'rb');
+                $written = $src ? stream_copy_to_stream($src, $fp) : false;
+                $src && fclose($src);
+                if ($written !== $part[1]) { fclose($fp); unlink($tmp); return array(self::ERROR_UPLOAD_TEMP, false); }
+            }
+            fclose($fp);
+            foreach ($state['parts'] as $i => $part) { unlink($base . '.' . $i . '_' . $last); }
+        }
+        $state['complete'] = true;
+        return array($tmp, true);
+    }
+
+    /** Session/volume binding for partial and completed upload paths. */
+    private function getUploadTempPrefix($volume)
+    {
+        $session = $this->session->start();
+        $key = $session->get('uploadTempKey');
+        if (!$key) {
+            $key = bin2hex(self::secureRandomBytes(32));
+            $session->set('uploadTempKey', $key);
+        }
+        $session->close();
+        return 'ELF' . hash('sha256', $key . '|' . get_class($volume) . '|' . $volume->getRootPath()) . '_';
+    }
+
+    private function rememberCompletedUpload($path, $name, $target)
+    {
+        $session = $this->session->start();
+        $files = $session->get('completedUploads', array());
+        foreach ($files as $key => $file) {
+            if ($file['expires'] <= time()) { unset($files[$key]); }
+        }
+        $files[basename($path)] = array('name' => $name, 'target' => $target, 'expires' => time() + 3600);
+        $session->set('completedUploads', $files)->close();
+    }
+
+    private function claimCompletedUpload($path, $name, $target)
+    {
+        $session = $this->session->start();
+        $files = $session->get('completedUploads', array());
+        $valid = isset($files[$path]) && $files[$path]['name'] === $name
+            && $files[$path]['target'] === $target && $files[$path]['expires'] > time();
+        if ($valid) {
+            unset($files[$path]);
+            $session->set('completedUploads', $files);
+        }
+        $session->close();
+        return $valid;
     }
 
     /**
@@ -3419,12 +3472,16 @@ class elFinder
                     // check chunked file upload commit
                     if ($chunk) {
                         if ($url === 'chunkfail' && $args['mimes'] === 'chunkfail') {
-                            $this->checkChunkedFile(null, $chunk, $cid, $tempDir);
+                            $this->checkChunkedFile(null, $chunk, $cid, $tempDir, $volume);
                             if (preg_match('/^(.+)(\.\d+_(\d+))\.part$/s', $chunk, $m)) {
                                 $result['warning'] = $this->error(self::ERROR_UPLOAD_FILE, $m[1], self::ERROR_UPLOAD_TEMP);
                             }
                             return $result;
                         } else {
+                            if (strpos($chunk, $this->getUploadTempPrefix($volume)) !== 0
+                                || !$this->claimCompletedUpload($chunk, $url, $target)) {
+                                return array_merge(array('error' => $this->error(self::ERROR_UPLOAD_TEMP)), $header);
+                            }
                             $tmpfname = $tempDir . '/' . $chunk;
                             $files['tmp_name'][$i] = $tmpfname;
                             $files['name'][$i] = $url;
@@ -3542,6 +3599,7 @@ class elFinder
                                 $result['_chunkfailure'] = true;
                                 $this->uploadDebug = 'Upload error: ' . $tmpname;
                             } else if ($name) {
+                                $this->rememberCompletedUpload($tmpname, $name, $target);
                                 $result['_chunkmerged'] = basename($tmpname);
                                 $result['_name'] = $name;
                                 $result['_mtime'] = $mtime;
@@ -5392,12 +5450,27 @@ var go = function() {
     }
 
     /**
-     * Decontaminate of filename
-     *
-     * @param      String  $name   The name
-     *
-     * @return     String  Decontaminated filename
+     * Generate security tokens without falling back to predictable PRNG values.
+     * @param int $length
+     * @return string
+     * @throws Exception
      */
+    public static function secureRandomBytes($length)
+    {
+        if (function_exists('random_bytes')) {
+            return random_bytes($length);
+        }
+        if (function_exists('openssl_random_pseudo_bytes')) {
+            $strong = false;
+            $bytes = openssl_random_pseudo_bytes($length, $strong);
+            if ($strong && $bytes !== false && strlen($bytes) === $length) {
+                return $bytes;
+            }
+        }
+        throw new Exception('A cryptographically secure random generator is required.');
+    }
+
+    /** Decontaminate a filename, removing directory components. */
     public static function filenameDecontaminate($name)
     {
         // Directory traversal defense
